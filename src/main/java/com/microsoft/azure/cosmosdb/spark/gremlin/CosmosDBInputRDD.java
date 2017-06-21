@@ -39,6 +39,7 @@ import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
 import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.util.star.StarGraph;
+import org.apache.tinkerpop.gremlin.structure.util.star.StarGraph.StarVertex;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,7 +139,7 @@ public final class CosmosDBInputRDD implements InputRDD {
                             }
                         }
                         Vertex v = graph.addVertex(properties.toArray());
-
+                        StarVertex sv=graph.getStarVertex();
                         if (t._2()._2().isPresent()) {
                             for (String edgeJson : t._2()._2().get()) {
                                 Document edgeDoc = new Document(edgeJson);
@@ -156,8 +157,8 @@ public final class CosmosDBInputRDD implements InputRDD {
                                     }
                                 }
                                 Vertex SinkVert=graph.addVertex(T.id, sinkVId);
-                                SinkVert.addEdge(edgeLabel, v, properties.toArray());
-                                
+                                SinkVert.addEdge(edgeLabel, sv, properties.toArray());
+                                sv.addEdge(edgeLabel,SinkVert,properties.toArray());
                                 //Adding the reverse edge too
                                 //v.addOutEdge(edgeLabel, graph.addVertex(T.id, sourceVId),properties.toArray());
                             
