@@ -155,7 +155,9 @@ public final class CosmosDBInputRDD implements InputRDD {
                                         properties.add(value);
                                     }
                                 }
-                                v.addEdge(edgeLabel, graph.addVertex(T.id, sinkVId), properties.toArray());
+                                Vertex SinkVert=graph.addVertex(T.id, sinkVId);
+                                SinkVert.addEdge(edgeLabel, v, properties.toArray());
+                                
                                 //Adding the reverse edge too
                                 //v.addOutEdge(edgeLabel, graph.addVertex(T.id, sourceVId),properties.toArray());
                             
