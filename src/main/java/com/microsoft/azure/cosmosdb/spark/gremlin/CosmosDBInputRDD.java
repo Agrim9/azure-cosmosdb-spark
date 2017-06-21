@@ -37,6 +37,7 @@ import org.apache.tinkerpop.gremlin.spark.structure.io.InputOutputHelper;
 import org.apache.tinkerpop.gremlin.spark.structure.io.InputRDD;
 import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
+import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.util.star.StarGraph;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -87,13 +88,20 @@ public final class CosmosDBInputRDD implements InputRDD {
             // Read the graph using the latest schema
 
             // parsing all properties - groupBy approach
-            JavaPairRDD<String, Iterable<String>> edges = cosmosDBRDD
+            JavaPairRDD<String, ArrayList<String>> edges = cosmosDBRDD
                     .toJavaRDD()
                     .filter(d -> d.get(VERTEXID_PROPERTY) != null)
-                    .mapToPair(d -> new Tuple2<>(
-                            d.getString(VERTEXID_PROPERTY),
-                            d.toJson()))
-                    .groupByKey();
+                    .mapToPair(d -> {
+                              ArrayList<String> temp_list=new ArrayList<String>();
+                              temp_list.add(d.toJson());
+                              return new Tuple2<>(d.getString(VERTEXID_PROPERTY), temp_list);
+                            })
+                    .reduceByKey((a,b)->{
+                        ArrayList<String> join_lists = new ArrayList<String>();
+                        join_lists.addAll(a);
+                        join_lists.addAll(b);
+                        return join_lists; 
+                    });
 
             return cosmosDBRDD
                     .toJavaRDD()
@@ -111,6 +119,7 @@ public final class CosmosDBInputRDD implements InputRDD {
                         properties.add(t._1());
                         properties.add(T.label);
                         properties.add(vertexDoc.getString(LABEL_PROPERTY));
+                        
                         for (Map.Entry<String, Object> entry : vertexDoc.getHashMap().entrySet()) {
                             String key = entry.getKey();
                             if (!key.startsWith("_") && !key.equals(LABEL_PROPERTY) && !key.equals(ID_PROPERTY)) {
@@ -133,20 +142,23 @@ public final class CosmosDBInputRDD implements InputRDD {
                         if (t._2()._2().isPresent()) {
                             for (String edgeJson : t._2()._2().get()) {
                                 Document edgeDoc = new Document(edgeJson);
-
                                 // add edge from document
                                 String edgeLabel = edgeDoc.getString(LABEL_PROPERTY);
                                 String sinkVId = edgeDoc.getString(SINK_PROPERTY);
+                                String sourceVId = edgeDoc.getString(VERTEXID_PROPERTY);
                                 properties = new ArrayList<>();
                                 for (Map.Entry<String, Object> entry : edgeDoc.getHashMap().entrySet()) {
                                     String key = entry.getKey();
                                     if (!key.startsWith("_") && !key.equals(LABEL_PROPERTY) && !key.equals(ID_PROPERTY)) {
                                         Object value = entry.getValue();
                                         properties.add(key);
-                                        properties.add(value.toString());
+                                        properties.add(value);
                                     }
                                 }
                                 v.addEdge(edgeLabel, graph.addVertex(T.id, sinkVId), properties.toArray());
+                                //Adding the reverse edge too
+                                //v.addOutEdge(edgeLabel, graph.addVertex(T.id, sourceVId),properties.toArray());
+                            
                             }
                         }
 
@@ -207,6 +219,7 @@ public final class CosmosDBInputRDD implements InputRDD {
                                     // Old schema
                                     JSONObject edgeObj = edgeCollection.iterator().next();
                                     String edgeLabel = edgeObj.getString(LABEL_PROPERTY);
+                                    //String sourceVId = edgeObj.getString()
                                     String sinkVId = edgeObj.getString(SINK_V_PROPERTY);
                                     properties = new ArrayList<>();
                                     Iterator<?> keyIterator = edgeObj.keys();
@@ -215,12 +228,13 @@ public final class CosmosDBInputRDD implements InputRDD {
                                         if (!key.startsWith("_") && !key.equals(LABEL_PROPERTY) && !key.equals(ID_PROPERTY)) {
                                             Object value = edgeObj.get(key);
                                             properties.add(key);
-                                            properties.add(value.toString());
+                                            properties.add(value);
                                         }
                                     }
                                     v.addEdge(edgeLabel, graph.addVertex(T.id, sinkVId), properties.toArray());
+                                    //Adding the reverse edge too
+                                    //v.addOutEdge(edgeLabel, graph.addVertex(T.id,),properties.toArray());
                                 }
-
 
                             }
                         }
